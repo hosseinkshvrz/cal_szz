@@ -35,6 +35,7 @@ import pandas as pd
 import numpy as np
 from pydriller import GitRepository
 from sklearn.linear_model import LogisticRegression
+from sklearn.utils import shuffle
 
 from dataset import get_data, feature_extractor
 from gensim.summarization import bm25
@@ -68,7 +69,7 @@ del corpus
 
 
 def check_szz(hash, file, retrieved):
-    git_repo = GitRepository('nova')
+    git_repo = GitRepository(os.path.join(BASE_DIR, 'nova'))
     commit = git_repo.get_commit(hash)
     last_modified = list(git_repo.get_commits_last_modified_lines(commit)[file])
     labels = [int(h in last_modified) for h in retrieved]
@@ -94,6 +95,7 @@ for i, row in train_df.iterrows():
             data[idx] = 0
         X = tfidf_model.transform([add_corpus[j] for j in data.keys()])
         y = np.fromiter(data.values(), dtype=float)
+        X, y = shuffle(X, y, random_state=0)
 
         clf = LogisticRegression(random_state=0).fit(X, y)
         relevance_prob = clf.predict_proba(tfidf_model.transform(add_corpus))[:, 1]
@@ -101,19 +103,16 @@ for i, row in train_df.iterrows():
         top_k_indices = np.argpartition(relevance_prob, -k)[-k:]
         sorted_top_k = top_k_indices[np.argsort(relevance_prob[top_k_indices])]
         top_b_indices = list(set(top_k_indices) - set(labeled_indices))[-batch_size:]
-        retrieved = [inv_added[j].split(' @ '[1]) for j in top_b_indices]
+        retrieved = [inv_added[j].split(' @ ')[1] for j in top_b_indices]
 
         retrieved_labels = check_szz(fix_hash, file, retrieved)
         for h_i in range(batch_size):
             data[top_b_indices[h_i]] = retrieved_labels[h_i]
         labeled_indices += top_b_indices
+        data = {doc_idx: data[doc_idx] for doc_idx in labeled_indices}
         batch_size += math.ceil(batch_size / 10)
         print()
-        break
-    print(query)
 
-# np.argmax(np.argsort(clf.predict_proba(tfidf_model.transform([['java'], ['python', 'True'], ['module', 'False']])), axis=0)[:, 1])
-# top2_indices = np.argpartition(clf.predict_proba(tfidf_model.transform([['java'], ['python', 'True'], ['import', 'module', 'nova', 'cloud'], ['module', 'False']]))[:, 1], -2)[-2:]
 
 # if __name__ == '__main__':
 #     pass
