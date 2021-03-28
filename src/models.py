@@ -169,23 +169,27 @@ class ActiveSZZ:
                     reciprocal, prc_k, avg_prc_k = self.evaluate(retrieved, true_hash)
 
                     print('\ncommit {} file {} took {}.'.format(fix_hash[:7], file, time_since(start)))
-                    print('reciprocal={:.2f}\t\tprecision@k={:.2f}\t\tavg_precision@k={:.2f}.\n'.format(reciprocal, prc_k, avg_prc_k))
+                    print('reciprocal={:.2f}\t\tp@k={:.2f}\t\tavg_p@k={:.2f}.\n'.format(reciprocal, prc_k, avg_prc_k))
                     reciprocals.append(reciprocal)
                     precision_ks.append(prc_k)
                     avg_precision_ks.append(avg_prc_k)
                     break
                 if cntr % 20 == 19:
                     print()
+        print('\n*** finished.')
+        print('MRR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}.\n'
+              .format(np.mean(reciprocals), np.mean(precision_ks), np.mean(avg_precision_ks)))
+
+    def test(self):
+        pass
+
+    def baseline(self):
+        pass
 
 
 if __name__ == '__main__':
     szz = ActiveSZZ(os.path.join(BASE_DIR, 'nova'))
-    # print(len([row['FixHashId'] for i, row in szz.train_df.iterrows()
-    #            if len(szz.git_repo.get_commits_last_modified_lines(szz.git_repo.get_commit(row['FixHashId']))) > 1]))
     szz.extract_features()
     szz.index_docs()
     szz.train()
 
-# szz.train_df.groupby(['FixHashId', 'File']).count()
-# '2fc92d9bd7b4e212a3f28e57565a4cf260982f30'
-# 'nova/tests/virt/libvirt/test_driver.py'
