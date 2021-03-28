@@ -78,12 +78,6 @@ def clean_text(text):
     return text
 
 
-def feature_extractor(corpus):
-    tfidf_vectorizer = TfidfVectorizer(tokenizer=lambda doc: doc, lowercase=False)
-    tfidf_vectorizer.fit(corpus)
-    return tfidf_vectorizer
-
-
 def get_data(mode='train'):
     ratio = 5
     df = pd.read_csv(os.path.join(data_path, 'openstack_links.csv'))
@@ -142,10 +136,6 @@ def store_clean_data():
 
     with open(os.path.join(data_path, 'clean_deleted.json'), 'w') as file:
         json.dump(deleted, file)
-
-    # for i, row in df.iterrows():
-    #     if i > split_idx:
-    #         break
 
 
 if __name__ == '__main__':
