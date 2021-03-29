@@ -152,9 +152,12 @@ class ActiveSZZ:
     def train(self):
         reciprocals, avg_reciprocals, precision_ks, avg_precision_ks = list(), list(), list(), list()
         for i, row in self.train_df.iterrows():
+            if row['FixHashId'] != '045e1b11fd058441539e5e6888da7bd873d58c89':
+                continue
             start = time.time()
             fix_hash = row['FixHashId']
-            file = parse_fname(row['File'])
+            original_name = row['File']
+            file = parse_fname(original_name)
             commit = self.git_repo.get_commit(fix_hash)
             self.current_last_modified = list(self.git_repo.get_commits_last_modified_lines(commit)[file])
             best_idx = self.initialize(fix_hash, file)
@@ -188,8 +191,8 @@ class ActiveSZZ:
 
                 if finished:
                     retrieved = self.get_ranked_output(labeled_indices)
-                    true_hash = list(self.train_df[(self.train_df['FixHashId'] == fix_hash) & (self.train_df['File'] == file)][
-                        'HashId'])
+                    true_hash = list(self.train_df[(self.train_df['FixHashId'] == fix_hash) &
+                                                   (self.train_df['File'] == original_name)]['HashId'])
                     reciprocal, avg_reciprocal, prc_k, avg_prc_k = self.evaluate(retrieved, true_hash)
 
                     print('\ncommit {} file {} took {}.'.format(fix_hash[:7], file, time_since(start)))
@@ -205,7 +208,8 @@ class ActiveSZZ:
             if (i - self.train_df.index[0]) % 100 == 99:
                 print('\n*** 100 sample stats')
                 print('MRR={:.2f}\t\tMARR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}\n'
-                      .format(np.mean(reciprocals), np.mean(avg_reciprocals), np.mean(precision_ks), np.mean(avg_precision_ks)))
+                      .format(np.mean(reciprocals), np.mean(avg_reciprocals),
+                              np.mean(precision_ks), np.mean(avg_precision_ks)))
         print('\n*** finished.')
         print('MRR={:.2f}\t\tMARR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}\n'
               .format(np.mean(reciprocals), np.mean(avg_reciprocals), np.mean(precision_ks), np.mean(avg_precision_ks)))
@@ -229,7 +233,8 @@ class ActiveSZZ:
         for i, row in self.train_df.iterrows():
             start = time.time()
             fix_hash = row['FixHashId']
-            file = parse_fname(row['File'])
+            original_name = row['File']
+            file = parse_fname(original_name)
             commit = self.git_repo.get_commit(fix_hash)
             last_modified = list(self.git_repo.get_commits_last_modified_lines(commit)[file])
             query = self.deleted[fix_hash][file]
@@ -256,8 +261,8 @@ class ActiveSZZ:
             scores = bm25_object.get_scores(query)
             sorted_indices = sorted(range(len(scores)), key=lambda j: scores[j], reverse=True)
             sorted_hashes = [inverse[j] for j in sorted_indices]
-            true_hash = list(self.train_df[(self.train_df['FixHashId'] == fix_hash) & (self.train_df['File'] == file)][
-                                 'HashId'])
+            true_hash = list(self.train_df[(self.train_df['FixHashId'] == fix_hash) &
+                                           (self.train_df['File'] == original_name)]['HashId'])
             reciprocal, avg_reciprocal, prc_k, avg_prc_k = self.evaluate(sorted_hashes, true_hash)
 
             print('\ncommit {} file {} took {}.'.format(fix_hash[:7], file, time_since(start)))
@@ -277,13 +282,13 @@ class ActiveSZZ:
 
         print('\n*** finished.')
         print('MRR={:.2f}\t\tMARR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}\n'
-              .format(np.mean(reciprocals), np.mean(avg_reciprocals), np.mean(precision_ks), np.mean(avg_precision_ks)))
+              .format(np.mean(reciprocals), np.mean(avg_reciprocals),
+                      np.mean(precision_ks), np.mean(avg_precision_ks)))
 
 
 if __name__ == '__main__':
     szz = ActiveSZZ(os.path.join(BASE_DIR, 'nova'))
-    # szz.extract_features()
-    # szz.index_docs()
-    # szz.train()
-    szz.baseline()
+    szz.extract_features()
+    szz.index_docs()
+    szz.train()
 
