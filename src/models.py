@@ -50,7 +50,7 @@ class ActiveSZZ:
             self.deleted = json.load(file)
         self.git_repo = GitRepository(project_path)
         self.hashes_train = list(pd.concat([self.train_df['HashId'], self.train_df['FixHashId']]).unique())
-        self.current_last_modified = []
+        self.current_last_modified = list()
         self.clf = LogisticRegression(random_state=0)
         self.bm25 = None
         self.tfidf_model = None
@@ -77,7 +77,7 @@ class ActiveSZZ:
 
     @staticmethod
     def reciprocal_rank(y, y_true):
-        best_rank = len(y_true)
+        best_rank = len(y)
         for h in y_true:
             try:
                 rank = y.index(h)
@@ -87,8 +87,19 @@ class ActiveSZZ:
                 best_rank = rank
                 if best_rank == 0:
                     break
-        reciprocal = 0 if best_rank == len(y_true) else 1 / (best_rank + 1)
-        return reciprocal
+        reciprocal = 0 if best_rank == len(y) else 1 / (best_rank + 1)
+        return reciprocal, best_rank
+
+    @staticmethod
+    def avg_reciprocal_rank(y, y_true):
+        reciprocals = list()
+        for i in range(len(y_true)):
+            reciprocal, index = ActiveSZZ.reciprocal_rank(y, y_true)
+            reciprocals.append(reciprocal)
+            if reciprocal > 0:
+                y = y[index+1:]
+        avg_reciprocal = np.mean(reciprocals)
+        return avg_reciprocal
 
     @staticmethod
     def precision_k(k, y, y_true):
@@ -102,10 +113,11 @@ class ActiveSZZ:
         return avg_precision_k
 
     def evaluate(self, y, y_true):
-        reciprocal = self.reciprocal_rank(y, y_true)
+        reciprocal, _ = self.reciprocal_rank(y, y_true)
+        avg_reciprocal = self.avg_reciprocal_rank(y, y_true)
         prc_k = self.precision_k(len(y_true), y, y_true)
         avg_prc_k = self.avg_precision_k(y, y_true)
-        return reciprocal, prc_k, avg_prc_k
+        return reciprocal, avg_reciprocal, prc_k, avg_prc_k
 
     def initialize(self, hash, file):
         query = self.deleted[hash][file]
@@ -137,7 +149,7 @@ class ActiveSZZ:
         return retrieved
 
     def train(self):
-        reciprocals, precision_ks, avg_precision_ks = [], [], []
+        reciprocals, avg_reciprocals, precision_ks, avg_precision_ks = list(), list(), list(), list()
         for i, row in self.train_df.iterrows():
             start = time.time()
             fix_hash = row['FixHashId']
@@ -177,23 +189,25 @@ class ActiveSZZ:
                     retrieved = self.get_ranked_output(labeled_indices)
                     true_hash = list(self.train_df[(self.train_df['FixHashId'] == fix_hash) & (self.train_df['File'] == file)][
                         'HashId'])
-                    reciprocal, prc_k, avg_prc_k = self.evaluate(retrieved, true_hash)
+                    reciprocal, avg_reciprocal, prc_k, avg_prc_k = self.evaluate(retrieved, true_hash)
 
                     print('\ncommit {} file {} took {}.'.format(fix_hash[:7], file, time_since(start)))
-                    print('reciprocal={:.2f}\t\tp@k={:.2f}\t\tavg_p@k={:.2f}.\n\n'.format(reciprocal, prc_k, avg_prc_k))
+                    print('reciprocal={:.2f}\t\tavg reciprocal={:.2f}\t\tp@k={:.2f}\t\tavg_p@k={:.2f}.\n\n'
+                          .format(reciprocal, avg_reciprocal, prc_k, avg_prc_k))
                     reciprocals.append(reciprocal)
+                    avg_reciprocals.append(avg_reciprocal)
                     precision_ks.append(prc_k)
                     avg_precision_ks.append(avg_prc_k)
                     break
                 if cntr % 20 == 19:
                     print()
-            if (i - self.train_df.index[0]) % 99 == 0:
+            if (i - self.train_df.index[0]) % 100 == 99:
                 print('\n*** 100 sample stats')
-                print('MRR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}.\n'
-                      .format(np.mean(reciprocals), np.mean(precision_ks), np.mean(avg_precision_ks)))
+                print('MRR={:.2f}\t\tMARR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}.\n'
+                      .format(np.mean(reciprocals), np.mean(avg_reciprocals), np.mean(precision_ks), np.mean(avg_precision_ks)))
         print('\n*** finished.')
-        print('MRR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}.\n'
-              .format(np.mean(reciprocals), np.mean(precision_ks), np.mean(avg_precision_ks)))
+        print('MRR={:.2f}\t\tMARR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}.\n'
+              .format(np.mean(reciprocals), np.mean(avg_reciprocals), np.mean(precision_ks), np.mean(avg_precision_ks)))
 
     def test(self):
         pass
@@ -208,9 +222,6 @@ class ActiveSZZ:
         # reciprocals.append(reciprocal)
         # precision_ks.append(prc_k)
         # avg_precision_ks.append(avg_prc_k)
-
-    def baseline(self):
-        pass
 
 
 if __name__ == '__main__':
