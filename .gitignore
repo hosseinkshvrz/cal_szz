@@ -1,3 +1,7 @@
 .idea
 temp.py
 nova
+__pycache__
+venv
+*.out
+*.log
