@@ -187,6 +187,10 @@ class ActiveSZZ:
                     break
                 if cntr % 20 == 19:
                     print()
+            if (i - self.train_df.index[0]) % 99 == 0:
+                print('\n*** 100 sample stats')
+                print('MRR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}.\n'
+                      .format(np.mean(reciprocals), np.mean(precision_ks), np.mean(avg_precision_ks)))
         print('\n*** finished.')
         print('MRR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}.\n'
               .format(np.mean(reciprocals), np.mean(precision_ks), np.mean(avg_precision_ks)))
