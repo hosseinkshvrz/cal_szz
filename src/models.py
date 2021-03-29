@@ -152,14 +152,18 @@ class ActiveSZZ:
     def train(self):
         reciprocals, avg_reciprocals, precision_ks, avg_precision_ks = list(), list(), list(), list()
         for i, row in self.train_df.iterrows():
-            if row['FixHashId'] != '045e1b11fd058441539e5e6888da7bd873d58c89':
+            if row['FixHashId'] != 'd9237dff7ace30dab331151c736d7cca97618e04':
                 continue
             start = time.time()
             fix_hash = row['FixHashId']
             original_name = row['File']
             file = parse_fname(original_name)
             commit = self.git_repo.get_commit(fix_hash)
-            self.current_last_modified = list(self.git_repo.get_commits_last_modified_lines(commit)[file])
+            try:
+                self.current_last_modified = list(self.git_repo.get_commits_last_modified_lines(commit)[file])
+            except KeyError:
+                print('\n NO CORRESPONDING SZZ CANDIDATE EXISTS.\n')
+                continue
             best_idx = self.initialize(fix_hash, file)
 
             data = dict()
@@ -231,12 +235,18 @@ class ActiveSZZ:
     def baseline(self):
         reciprocals, avg_reciprocals, precision_ks, avg_precision_ks = list(), list(), list(), list()
         for i, row in self.train_df.iterrows():
+            if row['FixHashId'] != 'd9237dff7ace30dab331151c736d7cca97618e04':
+                continue
             start = time.time()
             fix_hash = row['FixHashId']
             original_name = row['File']
             file = parse_fname(original_name)
             commit = self.git_repo.get_commit(fix_hash)
-            last_modified = list(self.git_repo.get_commits_last_modified_lines(commit)[file])
+            try:
+                last_modified = list(self.git_repo.get_commits_last_modified_lines(commit)[file])
+            except KeyError:
+                print('\n NO CORRESPONDING SZZ CANDIDATE EXISTS.\n')
+                continue
             query = self.deleted[fix_hash][file]
             corpus = list()
             inverse = list()
