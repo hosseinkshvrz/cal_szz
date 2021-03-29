@@ -248,7 +248,11 @@ class ActiveSZZ:
                             if cleaned:  # skip zero size docs
                                 corpus[-1] += cleaned
 
-            bm25_object = bm25.BM25(corpus)
+            try:
+                bm25_object = bm25.BM25(corpus)
+            except ZeroDivisionError:
+                print('\n*** THE COMMIT {} CORPUS IS EMPTY.\n'.format(fix_hash))
+                continue
             scores = bm25_object.get_scores(query)
             sorted_indices = sorted(range(len(scores)), key=lambda j: scores[j], reverse=True)
             sorted_hashes = [inverse[j] for j in sorted_indices]
