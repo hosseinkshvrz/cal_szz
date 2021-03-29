@@ -4,7 +4,6 @@ import os
 import nltk
 import pandas as pd
 import re
-from sklearn.feature_extraction.text import TfidfVectorizer
 from pydriller import RepositoryMining
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))

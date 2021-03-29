@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import re
 import time
 
 import pandas as pd
@@ -30,6 +31,14 @@ def infinity():
     while True:
         yield i
         i += 1
+
+
+def parse_fname(filename):
+    try:
+        filename = re.sub(r'\{.*\=>.*\}', re.search(r'\{.*\=>.*\}', filename).group(0).split(' => ')[-1][:-1], filename)
+    except AttributeError:
+        return filename
+    return filename
 
 
 class ActiveSZZ:
@@ -76,6 +85,8 @@ class ActiveSZZ:
                 continue
             if rank < best_rank:
                 best_rank = rank
+                if best_rank == 0:
+                    break
         reciprocal = 0 if best_rank == len(y_true) else 1 / (best_rank + 1)
         return reciprocal
 
@@ -130,7 +141,7 @@ class ActiveSZZ:
         for i, row in self.train_df.iterrows():
             start = time.time()
             fix_hash = row['FixHashId']
-            file = row['File']
+            file = parse_fname(row['File'])
             commit = self.git_repo.get_commit(fix_hash)
             self.current_last_modified = list(self.git_repo.get_commits_last_modified_lines(commit)[file])
             best_idx = self.initialize(fix_hash, file)
@@ -169,7 +180,7 @@ class ActiveSZZ:
                     reciprocal, prc_k, avg_prc_k = self.evaluate(retrieved, true_hash)
 
                     print('\ncommit {} file {} took {}.'.format(fix_hash[:7], file, time_since(start)))
-                    print('reciprocal={:.2f}\t\tp@k={:.2f}\t\tavg_p@k={:.2f}.\n'.format(reciprocal, prc_k, avg_prc_k))
+                    print('reciprocal={:.2f}\t\tp@k={:.2f}\t\tavg_p@k={:.2f}.\n\n'.format(reciprocal, prc_k, avg_prc_k))
                     reciprocals.append(reciprocal)
                     precision_ks.append(prc_k)
                     avg_precision_ks.append(avg_prc_k)
@@ -182,6 +193,17 @@ class ActiveSZZ:
 
     def test(self):
         pass
+        # self.train_df = get_data(mode='test')
+        # retrieved = self.get_ranked_output(labeled_indices)
+        # true_hash = list(self.train_df[(self.train_df['FixHashId'] == fix_hash) & (self.train_df['File'] == file)][
+        #                      'HashId'])
+        # reciprocal, prc_k, avg_prc_k = self.evaluate(retrieved, true_hash)
+        #
+        # print('\ncommit {} file {} took {}.'.format(fix_hash[:7], file, time_since(start)))
+        # print('reciprocal={:.2f}\t\tp@k={:.2f}\t\tavg_p@k={:.2f}.\n'.format(reciprocal, prc_k, avg_prc_k))
+        # reciprocals.append(reciprocal)
+        # precision_ks.append(prc_k)
+        # avg_precision_ks.append(avg_prc_k)
 
     def baseline(self):
         pass
