@@ -152,8 +152,6 @@ class ActiveSZZ:
     def train(self):
         reciprocals, avg_reciprocals, precision_ks, avg_precision_ks = list(), list(), list(), list()
         for i, row in self.train_df.iterrows():
-            if row['FixHashId'] != 'd9237dff7ace30dab331151c736d7cca97618e04':
-                continue
             start = time.time()
             fix_hash = row['FixHashId']
             original_name = row['File']
@@ -173,7 +171,7 @@ class ActiveSZZ:
             for cntr in infinity():
                 indices = np.delete(np.arange(len(self.add_corpus)), labeled_indices)
                 np.random.shuffle(indices)
-                for idx in indices[:20]:
+                for idx in indices[:100]:
                     data[idx] = 0
                 self.fit(data)
 
@@ -194,6 +192,7 @@ class ActiveSZZ:
                             set(self.current_last_modified) - set(collected))
 
                 if finished:
+                    self.fit(data)
                     retrieved = self.get_ranked_output(labeled_indices)
                     true_hash = list(self.train_df[(self.train_df['FixHashId'] == fix_hash) &
                                                    (self.train_df['File'] == original_name)]['HashId'])
@@ -235,8 +234,6 @@ class ActiveSZZ:
     def baseline(self):
         reciprocals, avg_reciprocals, precision_ks, avg_precision_ks = list(), list(), list(), list()
         for i, row in self.train_df.iterrows():
-            if row['FixHashId'] != 'd9237dff7ace30dab331151c736d7cca97618e04':
-                continue
             start = time.time()
             fix_hash = row['FixHashId']
             original_name = row['File']
