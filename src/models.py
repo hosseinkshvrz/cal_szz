@@ -121,17 +121,30 @@ class ActiveSZZ:
 
     @staticmethod
     def avg_precision_k(y, y_true):
-        k = len(y_true)
+        k = len(y)
         avg_precision_k = np.mean([ActiveSZZ.precision_k(i, y, y_true) for i in range(1, k+1)])
         return avg_precision_k
+
+    @staticmethod
+    def recall_k(k, y, y_true):
+        recall_k = len(set(y[:k]).intersection(set(y_true))) / k
+        return recall_k
+
+    @staticmethod
+    def avg_recall_k(y, y_true):
+        k = len(y_true)
+        avg_recall_k = np.mean([ActiveSZZ.recall_k(i, y, y_true) for i in range(1, k+1)])
+        return avg_recall_k
 
     def evaluate(self, y, y_true):
         reciprocal, _ = self.reciprocal_rank(y, y_true)
         avg_reciprocal = self.avg_reciprocal_rank(y, y_true)
         reg_reciprocal = self.reg_reciprocal_rank(y, y_true)
-        prc_k = self.precision_k(len(y_true), y, y_true)
+        prc_k = self.precision_k(len(y), y, y_true)
         avg_prc_k = self.avg_precision_k(y, y_true)
-        return reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k
+        rcl_k = self.recall_k(len(y_true), y, y_true)
+        avg_rcl_k = self.avg_recall_k(y, y_true)
+        return reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k, rcl_k, avg_rcl_k
 
     def initialize(self, hash, file):
         query = self.deleted[hash][file]
@@ -163,7 +176,7 @@ class ActiveSZZ:
         return retrieved
 
     def train(self):
-        reciprocals, avg_reciprocals, reg_reciprocals, precision_ks, avg_precision_ks = list(), list(), list(), list(), list()
+        reciprocals, avg_reciprocals, reg_reciprocals, precision_ks, avg_precision_ks, recall_ks, avg_recall_ks = list(), list(), list(), list(), list(), list(), list()
         for i, row in self.df.iterrows():
             start = time.time()
             fix_hash = row['FixHashId']
@@ -217,33 +230,38 @@ class ActiveSZZ:
                     retrieved = self.get_ranked_output(labeled_indices)
                     true_hash = list(self.df[(self.df['FixHashId'] == fix_hash) &
                                                    (self.df['File'] == original_name)]['HashId'])
-                    reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k = self.evaluate(retrieved, true_hash)
+                    reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k, rcl_k, avg_rcl_k = self.evaluate(retrieved, true_hash)
 
                     print('\ncommit {} file {} took {}.'.format(fix_hash[:7], file, time_since(start)))
-                    print('reciprocal={:.2f}\t\tavg reciprocal={:.2f}\t\treg reciprocal={:.2f}\t\tp@k={:.2f}\t\t'
-                          'avg_p@k={:.2f}\n\n'.format(reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k))
+                    print('recip={:.2f}\t\tavg recip={:.2f}\t\treg recip={:.2f}\t\tp@k={:.2f}\t\t'
+                          'avg_p@k={:.2f}\t\tr@k={:.2f}\t\tavg_r@k={:.2f}\n\n'
+                          .format(reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k, rcl_k, avg_rcl_k))
                     reciprocals.append(reciprocal)
                     avg_reciprocals.append(avg_reciprocal)
                     reg_reciprocals.append(reg_reciprocal)
                     precision_ks.append(prc_k)
                     avg_precision_ks.append(avg_prc_k)
+                    recall_ks.append(rcl_k)
+                    avg_recall_ks.append(avg_rcl_k)
                     break
                 if cntr % 20 == 19:
                     print()
             if (i - self.df.index[0]) % 100 == 99:
                 print('\n*** 100 sample stats')
-                print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}\n'
+                print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\t'
+                      'MAP@k={:.2f}\t\tmean R@k={:.2f}\t\tMAR@k={:.2f}\n'
                       .format(np.mean(reciprocals), np.mean(avg_reciprocals), np.mean(reg_reciprocals),
-                              np.mean(precision_ks), np.mean(avg_precision_ks)))
+                              np.mean(precision_ks), np.mean(avg_precision_ks), np.mean(recall_ks), np.mean(avg_recall_ks)))
         print('\n*** finished.')
-        print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}\n'
+        print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\t'
+              'MAP@k={:.2f}\t\tmean R@k={:.2f}\t\tMAR@k={:.2f}\n'
               .format(np.mean(reciprocals), np.mean(avg_reciprocals), np.mean(reg_reciprocals),
-                      np.mean(precision_ks), np.mean(avg_precision_ks)))
+                      np.mean(precision_ks), np.mean(avg_precision_ks), np.mean(recall_ks), np.mean(avg_recall_ks)))
 
     def test(self):
         self.df = get_data(mode='test')
         indices = np.arange(len(self.add_corpus))
-        reciprocals, avg_reciprocals, reg_reciprocals, precision_ks, avg_precision_ks = list(), list(), list(), list(), list()
+        reciprocals, avg_reciprocals, reg_reciprocals, precision_ks, avg_precision_ks, recall_ks, avg_recall_ks = list(), list(), list(), list(), list(), list(), list()
         for i, row in self.df.iterrows():
             start = time.time()
             fix_hash = row['FixHashId']
@@ -253,31 +271,36 @@ class ActiveSZZ:
             retrieved = self.get_ranked_output(indices)
             true_hash = list(self.df[(self.df['FixHashId'] == fix_hash) &
                                        (self.df['File'] == original_name)]['HashId'])
-            reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k = self.evaluate(retrieved, true_hash)
+            reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k, rcl_k, avg_rcl_k = self.evaluate(retrieved,
+                                                                                                           true_hash)
 
             print('\ncommit {} file {} took {}.'.format(fix_hash[:7], file, time_since(start)))
-            print('reciprocal={:.2f}\t\tavg reciprocal={:.2f}\t\treg reciprocal={:.2f}\t\tp@k={:.2f}\t\t'
-                  'avg_p@k={:.2f}\n\n'.format(reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k))
+            print('recip={:.2f}\t\tavg recip={:.2f}\t\treg recip={:.2f}\t\tp@k={:.2f}\t\t'
+                  'avg_p@k={:.2f}\t\tr@k={:.2f}\t\tavg_r@k={:.2f}\n\n'
+                  .format(reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k, rcl_k, avg_rcl_k))
 
             reciprocals.append(reciprocal)
             avg_reciprocals.append(avg_reciprocal)
             reg_reciprocals.append(reg_reciprocal)
             precision_ks.append(prc_k)
             avg_precision_ks.append(avg_prc_k)
+            recall_ks.append(rcl_k)
+            avg_recall_ks.append(avg_rcl_k)
 
             if (i - self.df.index[0]) % 100 == 99:
                 print('\n*** 100 sample stats')
-                print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}\n'
+                print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\t'
+                      'MAP@k={:.2f}\t\tmean R@k={:.2f}\t\tMAR@k={:.2f}\n'
                       .format(np.mean(reciprocals), np.mean(avg_reciprocals), np.mean(reg_reciprocals),
-                              np.mean(precision_ks), np.mean(avg_precision_ks)))
-
+                              np.mean(precision_ks), np.mean(avg_precision_ks), np.mean(recall_ks), np.mean(avg_recall_ks)))
         print('\n*** finished.')
-        print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}\n'
+        print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\t'
+              'MAP@k={:.2f}\t\tmean R@k={:.2f}\t\tMAR@k={:.2f}\n'
               .format(np.mean(reciprocals), np.mean(avg_reciprocals), np.mean(reg_reciprocals),
-                      np.mean(precision_ks), np.mean(avg_precision_ks)))
+                      np.mean(precision_ks), np.mean(avg_precision_ks), np.mean(recall_ks), np.mean(avg_recall_ks)))
 
     def baseline(self):
-        reciprocals, avg_reciprocals, reg_reciprocals, precision_ks, avg_precision_ks = list(), list(), list(), list(), list()
+        reciprocals, avg_reciprocals, reg_reciprocals, precision_ks, avg_precision_ks, recall_ks, avg_recall_ks = list(), list(), list(), list(), list(), list(), list()
         for i, row in self.df.iterrows():
             start = time.time()
             fix_hash = row['FixHashId']
@@ -314,32 +337,38 @@ class ActiveSZZ:
             sorted_indices = sorted(range(len(scores)), key=lambda j: scores[j], reverse=True)
             sorted_hashes = [inverse[j] for j in sorted_indices]
             true_hash = list(self.df[(self.df['FixHashId'] == fix_hash) &
-                                           (self.df['File'] == original_name)]['HashId'])
-            reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k = self.evaluate(sorted_hashes, true_hash)
+                                     (self.df['File'] == original_name)]['HashId'])
+            reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k, rcl_k, avg_rcl_k = self.evaluate(sorted_hashes,
+                                                                                                           true_hash)
 
             print('\ncommit {} file {} took {}.'.format(fix_hash[:7], file, time_since(start)))
-            print('reciprocal={:.2f}\t\tavg reciprocal={:.2f}\t\treg reciprocal={:.2f}\t\tp@k={:.2f}\t\t'
-                  'avg_p@k={:.2f}\n\n'.format(reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k))
+            print('recip={:.2f}\t\tavg recip={:.2f}\t\treg recip={:.2f}\t\tp@k={:.2f}\t\t'
+                  'avg_p@k={:.2f}\t\tr@k={:.2f}\t\tavg_r@k={:.2f}\n\n'
+                  .format(reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k, rcl_k, avg_rcl_k))
 
             reciprocals.append(reciprocal)
             avg_reciprocals.append(avg_reciprocal)
             reg_reciprocals.append(reg_reciprocal)
             precision_ks.append(prc_k)
             avg_precision_ks.append(avg_prc_k)
+            recall_ks.append(rcl_k)
+            avg_recall_ks.append(avg_rcl_k)
 
             if (i - self.df.index[0]) % 100 == 99:
                 print('\n*** 100 sample stats')
-                print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}\n'
+                print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\t'
+                      'MAP@k={:.2f}\t\tmean R@k={:.2f}\t\tMAR@k={:.2f}\n'
                       .format(np.mean(reciprocals), np.mean(avg_reciprocals), np.mean(reg_reciprocals),
-                              np.mean(precision_ks), np.mean(avg_precision_ks)))
-
+                              np.mean(precision_ks), np.mean(avg_precision_ks), np.mean(recall_ks),
+                              np.mean(avg_recall_ks)))
         print('\n*** finished.')
-        print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}\n'
+        print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\t'
+              'MAP@k={:.2f}\t\tmean R@k={:.2f}\t\tMAR@k={:.2f}\n'
               .format(np.mean(reciprocals), np.mean(avg_reciprocals), np.mean(reg_reciprocals),
-                      np.mean(precision_ks), np.mean(avg_precision_ks)))
+                      np.mean(precision_ks), np.mean(avg_precision_ks), np.mean(recall_ks), np.mean(avg_recall_ks)))
 
     def naive(self):
-        reciprocals, avg_reciprocals, reg_reciprocals, precision_ks, avg_precision_ks = list(), list(), list(), list(), list()
+        reciprocals, avg_reciprocals, reg_reciprocals, precision_ks, avg_precision_ks, recall_ks, avg_recall_ks = list(), list(), list(), list(), list(), list(), list()
         for i, row in self.df.iterrows():
             start = time.time()
             fix_hash = row['FixHashId']
@@ -353,28 +382,33 @@ class ActiveSZZ:
                 continue
             true_hash = list(self.df[(self.df['FixHashId'] == fix_hash) &
                                            (self.df['File'] == original_name)]['HashId'])
-            reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k = self.evaluate(last_modified, true_hash)
+            reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k, rcl_k, avg_rcl_k = self.evaluate(last_modified,
+                                                                                                           true_hash)
 
             print('\ncommit {} file {} took {}.'.format(fix_hash[:7], file, time_since(start)))
-            print('reciprocal={:.2f}\t\tavg reciprocal={:.2f}\t\treg reciprocal={:.2f}\t\tp@k={:.2f}\t\t'
-                  'avg_p@k={:.2f}\n\n'.format(reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k))
-
+            print('recip={:.2f}\t\tavg recip={:.2f}\t\treg recip={:.2f}\t\tp@k={:.2f}\t\t'
+                  'avg_p@k={:.2f}\t\tr@k={:.2f}\t\tavg_r@k={:.2f}\n\n'
+                  .format(reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k, rcl_k, avg_rcl_k))
             reciprocals.append(reciprocal)
             avg_reciprocals.append(avg_reciprocal)
             reg_reciprocals.append(reg_reciprocal)
             precision_ks.append(prc_k)
             avg_precision_ks.append(avg_prc_k)
+            recall_ks.append(rcl_k)
+            avg_recall_ks.append(avg_rcl_k)
 
             if (i - self.df.index[0]) % 100 == 99:
                 print('\n*** 100 sample stats')
-                print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}\n'
+                print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\t'
+                      'MAP@k={:.2f}\t\tmean R@k={:.2f}\t\tMAR@k={:.2f}\n'
                       .format(np.mean(reciprocals), np.mean(avg_reciprocals), np.mean(reg_reciprocals),
-                              np.mean(precision_ks), np.mean(avg_precision_ks)))
-
+                              np.mean(precision_ks), np.mean(avg_precision_ks), np.mean(recall_ks),
+                              np.mean(avg_recall_ks)))
         print('\n*** finished.')
-        print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}\n'
+        print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\t'
+              'MAP@k={:.2f}\t\tmean R@k={:.2f}\t\tMAR@k={:.2f}\n'
               .format(np.mean(reciprocals), np.mean(avg_reciprocals), np.mean(reg_reciprocals),
-                      np.mean(precision_ks), np.mean(avg_precision_ks)))
+                      np.mean(precision_ks), np.mean(avg_precision_ks), np.mean(recall_ks), np.mean(avg_recall_ks)))
 
 
 if __name__ == '__main__':
@@ -382,4 +416,4 @@ if __name__ == '__main__':
     szz.extract_features()
     szz.index_docs()
     szz.train()
-    szz.test()
+    # szz.test()
