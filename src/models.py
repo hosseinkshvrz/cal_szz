@@ -44,13 +44,13 @@ def parse_fname(filename):
 
 class ActiveSZZ:
     def __init__(self, project_path):
-        self.train_df = get_data(mode='train')
+        self.df = get_data(mode='train')
         with open(os.path.join(data_path, 'clean_added.json')) as file:
             self.added = json.load(file)
         with open(os.path.join(data_path, 'clean_deleted.json')) as file:
             self.deleted = json.load(file)
         self.git_repo = GitRepository(project_path)
-        self.hashes_train = list(pd.concat([self.train_df['HashId'], self.train_df['FixHashId']]).unique())
+        self.hashes_train = list(pd.concat([self.df['HashId'], self.df['FixHashId']]).unique())
         self.current_last_modified = list()
         self.clf = LogisticRegression(random_state=0)
         self.bm25 = None
@@ -164,7 +164,7 @@ class ActiveSZZ:
 
     def train(self):
         reciprocals, avg_reciprocals, reg_reciprocals, precision_ks, avg_precision_ks = list(), list(), list(), list(), list()
-        for i, row in self.train_df.iterrows():
+        for i, row in self.df.iterrows():
             start = time.time()
             fix_hash = row['FixHashId']
             original_name = row['File']
@@ -215,8 +215,8 @@ class ActiveSZZ:
                         self.fit(data)
 
                     retrieved = self.get_ranked_output(labeled_indices)
-                    true_hash = list(self.train_df[(self.train_df['FixHashId'] == fix_hash) &
-                                                   (self.train_df['File'] == original_name)]['HashId'])
+                    true_hash = list(self.df[(self.df['FixHashId'] == fix_hash) &
+                                                   (self.df['File'] == original_name)]['HashId'])
                     reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k = self.evaluate(retrieved, true_hash)
 
                     print('\ncommit {} file {} took {}.'.format(fix_hash[:7], file, time_since(start)))
@@ -230,7 +230,7 @@ class ActiveSZZ:
                     break
                 if cntr % 20 == 19:
                     print()
-            if (i - self.train_df.index[0]) % 5 == 4:
+            if (i - self.df.index[0]) % 100 == 99:
                 print('\n*** 100 sample stats')
                 print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}\n'
                       .format(np.mean(reciprocals), np.mean(avg_reciprocals), np.mean(reg_reciprocals),
@@ -241,22 +241,44 @@ class ActiveSZZ:
                       np.mean(precision_ks), np.mean(avg_precision_ks)))
 
     def test(self):
-        pass
-        # self.train_df = get_data(mode='test')
-        # retrieved = self.get_ranked_output(labeled_indices)
-        # true_hash = list(self.train_df[(self.train_df['FixHashId'] == fix_hash) & (self.train_df['File'] == file)][
-        #                      'HashId'])
-        # reciprocal, prc_k, avg_prc_k = self.evaluate(retrieved, true_hash)
-        #
-        # print('\ncommit {} file {} took {}.'.format(fix_hash[:7], file, time_since(start)))
-        # print('reciprocal={:.2f}\t\tp@k={:.2f}\t\tavg_p@k={:.2f}.\n'.format(reciprocal, prc_k, avg_prc_k))
-        # reciprocals.append(reciprocal)
-        # precision_ks.append(prc_k)
-        # avg_precision_ks.append(avg_prc_k)
+        self.df = get_data(mode='test')
+        indices = np.arange(len(self.add_corpus))
+        reciprocals, avg_reciprocals, reg_reciprocals, precision_ks, avg_precision_ks = list(), list(), list(), list(), list()
+        for i, row in self.df.iterrows():
+            start = time.time()
+            fix_hash = row['FixHashId']
+            original_name = row['File']
+            file = parse_fname(original_name)
+
+            retrieved = self.get_ranked_output(indices)
+            true_hash = list(self.df[(self.df['FixHashId'] == fix_hash) &
+                                       (self.df['File'] == original_name)]['HashId'])
+            reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k = self.evaluate(retrieved, true_hash)
+
+            print('\ncommit {} file {} took {}.'.format(fix_hash[:7], file, time_since(start)))
+            print('reciprocal={:.2f}\t\tavg reciprocal={:.2f}\t\treg reciprocal={:.2f}\t\tp@k={:.2f}\t\t'
+                  'avg_p@k={:.2f}\n\n'.format(reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k))
+
+            reciprocals.append(reciprocal)
+            avg_reciprocals.append(avg_reciprocal)
+            reg_reciprocals.append(reg_reciprocal)
+            precision_ks.append(prc_k)
+            avg_precision_ks.append(avg_prc_k)
+
+            if (i - self.df.index[0]) % 100 == 99:
+                print('\n*** 100 sample stats')
+                print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}\n'
+                      .format(np.mean(reciprocals), np.mean(avg_reciprocals), np.mean(reg_reciprocals),
+                              np.mean(precision_ks), np.mean(avg_precision_ks)))
+
+        print('\n*** finished.')
+        print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}\n'
+              .format(np.mean(reciprocals), np.mean(avg_reciprocals), np.mean(reg_reciprocals),
+                      np.mean(precision_ks), np.mean(avg_precision_ks)))
 
     def baseline(self):
         reciprocals, avg_reciprocals, reg_reciprocals, precision_ks, avg_precision_ks = list(), list(), list(), list(), list()
-        for i, row in self.train_df.iterrows():
+        for i, row in self.df.iterrows():
             start = time.time()
             fix_hash = row['FixHashId']
             original_name = row['File']
@@ -291,8 +313,8 @@ class ActiveSZZ:
             scores = bm25_object.get_scores(query)
             sorted_indices = sorted(range(len(scores)), key=lambda j: scores[j], reverse=True)
             sorted_hashes = [inverse[j] for j in sorted_indices]
-            true_hash = list(self.train_df[(self.train_df['FixHashId'] == fix_hash) &
-                                           (self.train_df['File'] == original_name)]['HashId'])
+            true_hash = list(self.df[(self.df['FixHashId'] == fix_hash) &
+                                           (self.df['File'] == original_name)]['HashId'])
             reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k = self.evaluate(sorted_hashes, true_hash)
 
             print('\ncommit {} file {} took {}.'.format(fix_hash[:7], file, time_since(start)))
@@ -305,7 +327,7 @@ class ActiveSZZ:
             precision_ks.append(prc_k)
             avg_precision_ks.append(avg_prc_k)
 
-            if (i - self.train_df.index[0]) % 5 == 4:
+            if (i - self.df.index[0]) % 100 == 99:
                 print('\n*** 100 sample stats')
                 print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}\n'
                       .format(np.mean(reciprocals), np.mean(avg_reciprocals), np.mean(reg_reciprocals),
@@ -318,7 +340,7 @@ class ActiveSZZ:
 
     def naive(self):
         reciprocals, avg_reciprocals, reg_reciprocals, precision_ks, avg_precision_ks = list(), list(), list(), list(), list()
-        for i, row in self.train_df.iterrows():
+        for i, row in self.df.iterrows():
             start = time.time()
             fix_hash = row['FixHashId']
             original_name = row['File']
@@ -329,8 +351,8 @@ class ActiveSZZ:
             except KeyError:
                 print('\n NO CORRESPONDING SZZ CANDIDATE EXISTS.\n')
                 continue
-            true_hash = list(self.train_df[(self.train_df['FixHashId'] == fix_hash) &
-                                           (self.train_df['File'] == original_name)]['HashId'])
+            true_hash = list(self.df[(self.df['FixHashId'] == fix_hash) &
+                                           (self.df['File'] == original_name)]['HashId'])
             reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k = self.evaluate(last_modified, true_hash)
 
             print('\ncommit {} file {} took {}.'.format(fix_hash[:7], file, time_since(start)))
@@ -343,7 +365,7 @@ class ActiveSZZ:
             precision_ks.append(prc_k)
             avg_precision_ks.append(avg_prc_k)
 
-            if (i - self.train_df.index[0]) % 5 == 4:
+            if (i - self.df.index[0]) % 100 == 99:
                 print('\n*** 100 sample stats')
                 print('MRR={:.2f}\t\tMARR={:.2f}\t\tMRRR={:.2f}\t\tmean P@k={:.2f}\t\tMAP@k={:.2f}\n'
                       .format(np.mean(reciprocals), np.mean(avg_reciprocals), np.mean(reg_reciprocals),
@@ -360,4 +382,4 @@ if __name__ == '__main__':
     szz.extract_features()
     szz.index_docs()
     szz.train()
-
+    szz.test()
