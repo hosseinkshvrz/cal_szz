@@ -120,8 +120,7 @@ class ActiveSZZ:
         return precision_k
 
     @staticmethod
-    def avg_precision_k(y, y_true):
-        k = len(y)
+    def avg_precision_k(k, y, y_true):
         avg_precision_k = np.mean([ActiveSZZ.precision_k(i, y, y_true) for i in range(1, k+1)])
         return avg_precision_k
 
@@ -136,12 +135,14 @@ class ActiveSZZ:
         avg_recall_k = np.mean([ActiveSZZ.recall_k(i, y, y_true) for i in range(1, k+1)])
         return avg_recall_k
 
-    def evaluate(self, y, y_true):
+    def evaluate(self, y, y_true, k=None):
+        if not k:
+            k = len(y)
         reciprocal, _ = self.reciprocal_rank(y, y_true)
         avg_reciprocal = self.avg_reciprocal_rank(y, y_true)
         reg_reciprocal = self.reg_reciprocal_rank(y, y_true)
-        prc_k = self.precision_k(len(y), y, y_true)
-        avg_prc_k = self.avg_precision_k(y, y_true)
+        prc_k = self.precision_k(k, y, y_true)
+        avg_prc_k = self.avg_precision_k(k, y, y_true)
         rcl_k = self.recall_k(len(y_true), y, y_true)
         avg_rcl_k = self.avg_recall_k(y, y_true)
         return reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k, rcl_k, avg_rcl_k
@@ -230,7 +231,9 @@ class ActiveSZZ:
                     retrieved = self.get_ranked_output(labeled_indices)
                     true_hash = list(self.df[(self.df['FixHashId'] == fix_hash) &
                                                    (self.df['File'] == original_name)]['HashId'])
-                    reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k, rcl_k, avg_rcl_k = self.evaluate(retrieved, true_hash)
+                    reciprocal, avg_reciprocal, reg_reciprocal, prc_k, avg_prc_k, rcl_k, avg_rcl_k = self.evaluate(retrieved,
+                                                                                                                   true_hash,
+                                                                                                                   len(self.current_last_modified))
 
                     print('\ncommit {} file {} took {}.'.format(fix_hash[:7], file, time_since(start)))
                     print('recip={:.2f}\t\tavg recip={:.2f}\t\treg recip={:.2f}\t\tp@k={:.2f}\t\t'
