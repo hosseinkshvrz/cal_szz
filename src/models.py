@@ -121,8 +121,17 @@ class ActiveSZZ:
 
     @staticmethod
     def avg_precision_k(k, y, y_true):
-        avg_precision_k = np.mean([ActiveSZZ.precision_k(i, y, y_true) for i in range(1, k+1)])
-        return avg_precision_k
+        if len(y) > k:
+            y = y[:k]
+        score = 0.0
+        num_hits = 0.0
+        for i, p in enumerate(y):
+            if p in y_true and p not in y[:i]:
+                num_hits += 1.0
+                score += num_hits / (i + 1.0)
+        if not y_true:
+            return 0.0
+        return score / min(len(y_true), k)
 
     @staticmethod
     def recall_k(k, y, y_true):
